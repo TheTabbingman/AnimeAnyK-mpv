@@ -85,6 +85,13 @@ function Core_jbgyampcwu.GetVideoHeightInt()
     return videoHeightInt
 end
 
+function Core_jbgyampcwu.GetVideoWidthInt()
+    local videoWidthString = mp.get_property("width")
+    local videoWidthInt = tonumber(videoWidthString)
+
+    return videoWidthInt
+end
+
 -- Return indicator file exist or not, and indicator file full path
 --
 -- Return value:
@@ -109,11 +116,15 @@ function Core_jbgyampcwu.GetIndicatorFileStatus()
     --
     -- Remove "always on" status at same time
     --     so 2nd and future request could cycle as usual (should be able to add GLSL back)
-    if UserInput_jbgyampcwu.AlwaysOn
-    then
-        UserInput_jbgyampcwu.AlwaysOn = false
-        return true, indicatorFileFullPath
-    end
+
+    -- Disabled my TheTabbingMan because it just makes so the first time you manually trigger it
+    -- it clears the shaders and then requires you to restart plex in order for it to automatically trigger again.
+     
+    -- if UserInput_jbgyampcwu.AlwaysOn
+    -- then
+        -- UserInput_jbgyampcwu.AlwaysOn = false
+        -- return true, indicatorFileFullPath
+    -- end
 
     -- Try indicator file exist
     local indicatorFileExist, _ = mpUtils.file_info(indicatorFileFullPath)
@@ -127,15 +138,15 @@ end
 
 -- Get Anime4K Command
 -- Different video resolution leads to different command results
-function Core_jbgyampcwu.GetAnime4KCommand(videoHeightInt)
+function Core_jbgyampcwu.GetAnime4KCommand(videoHeightInt, videoWidthInt)
     -- Anime4K profile preset
     -- See "Best Practices" section
     -- https://github.com/bloc97/Anime4K/blob/master/GLSL_Instructions.md
-    local restoreCnnQuality = "M"
-    local restoreCnnSoftQuality = "M"
-    local upscaleCnnX2Quality = "M"
-    local upscaleCnnX2Quality_2 = "S"
-    local upscaleDenoiseCnnX2Quality = "M"
+    local restoreCnnQuality = "VL"
+    local restoreCnnSoftQuality = "VL"
+    local upscaleCnnX2Quality = "VL"
+    local upscaleCnnX2Quality_2 = "M"
+    local upscaleDenoiseCnnX2Quality = "VL"
 
     --
     -- BEGIN Const
@@ -165,19 +176,26 @@ function Core_jbgyampcwu.GetAnime4KCommand(videoHeightInt)
         -- Mode A
         if videoHeightInt >= 1080
         then
-            return restoreCnnPath .. upscaleCnnX2Path .. autoDownscalePreX2Path .. autoDownscalePreX4Path .. upscaleCnnX2Path_2, " A (Fast)"
+            -- Sometimes useful for stuff already upscaled
+            -- if videoWidthInt == 1440
+            -- then
+                -- return "", " Skipping because width is 1440"
+            -- else
+                return restoreCnnPath .. upscaleCnnX2Path .. autoDownscalePreX2Path .. autoDownscalePreX4Path .. upscaleCnnX2Path_2, " A (HQ)"
+            -- end
         end
 
         -- Mode B
         if videoHeightInt >= 720
         then
-            return restoreCnnSoftPath .. upscaleCnnX2Path .. autoDownscalePreX2Path .. autoDownscalePreX4Path .. upscaleCnnX2Path_2, " B (Fast)"
+			-- return upscaleDenoiseCnnX2Path .. autoDownscalePreX2Path .. autoDownscalePreX4Path .. upscaleCnnX2Path_2, " C (HQ)"
+            return restoreCnnSoftPath .. upscaleCnnX2Path .. autoDownscalePreX2Path .. autoDownscalePreX4Path .. upscaleCnnX2Path_2, " B (HQ)"
         end
 
         -- Mode C
         if videoHeightInt < 720
         then
-            return upscaleDenoiseCnnX2Path .. autoDownscalePreX2Path .. autoDownscalePreX4Path .. upscaleCnnX2Path_2, " C (Fast)"
+            return upscaleDenoiseCnnX2Path .. autoDownscalePreX2Path .. autoDownscalePreX4Path .. upscaleCnnX2Path_2, " C (HQ)"
         end
     end
 
@@ -204,6 +222,7 @@ end
 -- Send Anime4K command to mpv
 function Core_jbgyampcwu.SendAnime4kCommand()
     local videoHeightInt = Core_jbgyampcwu.GetVideoHeightInt()
+    local videoWidthInt = Core_jbgyampcwu.GetVideoWidthInt()
 
     -- Prepare final command, will send to mpv
     local finalCommand
@@ -255,7 +274,7 @@ function Core_jbgyampcwu.SendAnime4kCommand()
     else
         if videoHeightInt < 2160
         then
-            finalCommand = Core_jbgyampcwu.GetAnime4KCommand(videoHeightInt)
+            finalCommand = Core_jbgyampcwu.GetAnime4KCommand(videoHeightInt, videoWidthInt)
             mp.command(finalCommand)
         end
     end
